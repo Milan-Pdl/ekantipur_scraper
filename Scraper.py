@@ -218,5 +218,64 @@ def scrape_cartoon(page):
         print(f"Error extracting cartoon: {e}")
         return {}
 
+def run_scraper():
+    """
+    Run the Ekantipur scraper and save results to a JSON file.
 
+    This function:
+        1. Launches a Playwright Chromium browser.
+        2. Opens a page and scrapes:
+            - Top entertainment articles (scrape_entertainment)
+            - Cartoon of the Day (scrape_cartoon)
+        3. Closes the browser safely.
+        4. Saves the collected data to 'output.json'.
+    
+    Error handling:
+        - Any browser or scraping error is caught and logged.
+        - File write errors are caught and logged.
+        - Function continues without crashing on individual errors.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+        - Output is written to 'output.json' in the current directory.
+
+    Example usage:
+        run_scraper()
+        -> Saves entertainment news and cartoon to output.json
+    """
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+
+            page = browser.new_page()
+
+            entertainment = scrape_entertainment(page)
+            cartoon = scrape_cartoon(page)
+
+            browser.close()
+
+    except Exception as e:
+        print(f"Critical error: {e}")
+        return
+
+    data = {
+        "entertainment_news": entertainment,
+        "cartoon": cartoon
+    }
+
+    try:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        print("\nSaved to output.json ")
+
+    except Exception as e:
+        print(f"Error saving file: {e}")
+
+
+if __name__ == "__main__":
+    run_scraper()
 
