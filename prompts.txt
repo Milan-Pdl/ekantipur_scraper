@@ -1,0 +1,185 @@
+
+prompts.txt :: Ekantipur Scraper
+  udio Bee Web Scraping Intern :: Practical Test Submission
+
+This file documents every prompt I used to build this project, in the exact
+order I sent them. It also covers what I did manually before any prompt was
+written.
+
+
+PHASE 1  (SETUP) 
+
+I was working on Windows so I opened PowerShell and followed the uv docs at
+https://docs.astral.sh/uv/ directly:
+
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+Then restarted the terminal and ran:
+
+    cd Ekantipur_Scrapper
+    uv init
+    uv add playwright
+    uv run playwright install chromium
+
+
+PHASE 2 — WEBSITE INSPECTION 
+
+Before writing any prompt I opened both pages in Chrome and used DevTools
+(F12 → Ctrl+Shift+C) to manually find every selector I needed.
+
+ENTERTAINMENT PAGE — https://ekantipur.com/entertainment
+
+  Bottom nav HTML I copied:
+    <a href="https://ekantipur.com/entertainment"><span>मनोरञ्जन</span></a>
+  Selector: bottom-nav a[href*="entertainment"]
+
+  Each article card HTML I copied:
+    <div class="category-inner-wrapper">
+      <div class="category-description">
+        <h2><a href="...">TITLE</a></h2>
+        <div class="author-name"><p><a href="...">AUTHOR</a></p></div>
+      </div>
+      <div class="category-image">
+        <figure><img class="loaded" src="CDN_URL" alt="..."></figure>
+      </div>
+    </div>
+
+  Selectors I wrote down:
+    Card wrapper  : .category-inner-wrapper
+    Title         : .category-description h2 a
+    Author        : .author-name a
+    Image         : .category-image img  (data-src first, then src)
+    Category      : no badge on this page — default "मनोरञ्जन"
+
+CARTOON PAGE — https://ekantipur.com/cartoon
+
+  Description HTML I copied:
+    <div class="cartoon-description">
+      <p>गजब छ बा! - अविन</p>
+      <div class="date"><p>चैत्र ३, २०८२</p></div>
+    </div>
+
+  Image HTML I copied:
+    <div class="cartoon-image">
+      <figure>
+        <a href="FULL_CDN_URL" data-fancybox="gallery">
+          <img class="loaded" src="THUMB_CDN_URL">
+        </a>
+      </figure>
+    </div>
+
+  Selectors I wrote down:
+    Title + Author : .cartoon-description p:first-child  (split on " - ")
+    Image (full)   : .cartoon-image figure a[href]
+    Image (thumb)  : .cartoon-image img[src]  (fallback)
+
+
+PHASE 3 :: PROMPTS  (AI used for code generation only)
+
+PROMPT 1 ::  scrape_entertainment function
+
+  "you are working as a webscrapper in a reputed company. your task is to
+  write a function name scrape_entertainment with accepts a parameter page
+  (playwright page object) using as per the structure mentioned
+
+  base_url is https://ekantipur.com
+
+  HTML copied:
+    <a href='https://ekantipur.com/entertainment'><span>मनोरञ्जन</span></a>
+  Selector noted: bottom-nav a[href*='entertainment']
+
+  ENTERTAINMENT PAGE — https://ekantipur.com/entertainment
+  Each article card:
+    <div class='category-inner-wrapper'>
+      <div class='category-description'>
+        <h2><a href='...'>TITLE</a></h2>
+        <div class='author-name'><p><a href='...'>AUTHOR</a></p></div>
+      </div>
+      <div class='category-image'>
+        <figure><img class='loaded' src='CDN_URL' alt='...'></figure>
+      </div>
+    </div>
+
+  Selectors noted:
+    Card wrapper  : .category-inner-wrapper
+    Title         : .category-description h2 a
+    Author        : .author-name a
+    Image         : .category-image img  (src or data-src for lazy-load)
+    Category      : derived from href path segment (e.g. /entertainment/...)"
+
+  Result: AI returned a working scrape_entertainment function.
+  I tested it — it returned a valid list of articles. No changes needed.
+
+PROMPT 2 :: scrape_cartoon function
+
+  Follow-up in the same conversation so the AI had memory of prompt 1.
+
+  "Doing a follow up to the prompt one as llm has a memory, write a function
+  scrape_cartoon your task is to write a function name scrape_cartoon with
+  accepts a parameter page (playwright page object) using as per the structure
+  mentioned
+
+  CARTOON PAGE — https://ekantipur.com/cartoon
+  Description block:
+    <div class='cartoon-description'>
+      <p>गजब छ बा! - अविन</p>
+      <div class='date'><p>चैत्र ३, २०८२</p></div>
+    </div>
+  Image block:
+    <div class='cartoon-image'>
+      <figure>
+        <a href='FULL_CDN_URL' data-fancybox='gallery'>
+          <img class='loaded' src='THUMB_CDN_URL'>
+        </a>
+      </figure>
+    </div>
+
+  Selectors noted:
+    Title  : .cartoon-description p:first-child  (split on ' - ')
+    author : split on ' - '
+    Image (full) : .cartoon-image figure a[href]"
+
+  Result: AI returned a working scrape_cartoon function.
+  Tested — returned the correct title, author, and image URL.
+
+PROMPT 3 — orchestrator / run_scraper function
+
+
+  "write a orchestrator function that combines the output coming from
+  scrape_entertainment and scrape_cartoon into a output.json file in
+  the current directory
+
+  json format:
+  {
+    'entertainment_news': [ {title, image_url, category, author} ],
+    'cartoon_of_the_day': {title, image_url, author}
+  }"
+
+  Result: AI returned a run_scraper function that launches a single browser,
+  calls both scraper functions, combines the output, and writes output.json.
+
+
+WHAT I DID NOT USE AI FOR
+
+  - Installing uv and setting up the project (followed the docs)
+  - Finding CSS selectors (used DevTools myself on both pages)
+  - Understanding data-src vs src for lazy loading (read Playwright docs)
+  - Debugging with print() to verify article counts
+  - Checking the output.json format matched the assessment requirement
+
+
+SELECTOR REFERENCE
+
+
+  Entertainment page:
+    Card wrapper   .category-inner-wrapper
+    Title          h2 a                       inner_text()
+    Author         .author-name a             inner_text() or null
+    Image          img                        data-src then src
+    Category       hardcoded "मनोरञ्जन"       (no badge element on this page)
+
+  Cartoon page:
+    Title + Author .cartoon-description p     split(" - ", 1)
+    Image (full)   .cartoon-image a           href attribute
+    Image (thumb)  .cartoon-image img         src attribute (fallback)
+

@@ -2,14 +2,14 @@ import json
 from playwright.sync_api import sync_playwright, TimeoutError
 
 BASE_URL = "https://ekantipur.com"
-OUTPUT_FILE = "output.json" #output file location
-TOP_N = 5 #getting top five news
+OUTPUT_FILE = "output.json"  # output file location
+TOP_N = 5  # getting top five news
 
 
 def make_absolute(url):
     """
-    this function ensure thr base url is correct by doing some format checking
-    
+    Ensure the URL is absolute by checking its format.
+    Handles relative paths (/) and protocol-relative URLs (//).
     """
     if not url:
         return None
@@ -21,10 +21,9 @@ def make_absolute(url):
 
 
 def get_text(el):
-    """ 
+    """
     Return cleaned text from an element, or None if unavailable.
     Handles missing elements and avoids crashes during scraping.
-    
     """
     try:
         return el.inner_text().strip() if el else None
@@ -34,10 +33,8 @@ def get_text(el):
 
 def get_attr(el, attr):
     """
-    This function attempts to retrieve the value of the given attribute from the element.
-    If the element is None or an error occurs (e.g., attribute missing)
-    it returns None instead of raising an exception.
-
+    Retrieve the value of the given attribute from the element.
+    Returns None if the element is missing or the attribute doesn't exist.
     """
     try:
         return el.get_attribute(attr) if el else None
@@ -45,12 +42,10 @@ def get_attr(el, attr):
         return None
 
 
-def safe_goto(page, url) ->bool:
+def safe_goto(page, url) -> bool:
     """
-    This function attempts to open the specified URL in the provided page object.
-    If the page fails to load (timeout or other errors), it logs the issue and
-    returns False instead of raising an exception.
-
+    Navigate to a URL safely.
+    Returns False on timeout or error instead of crashing the scraper.
     """
     try:
         print(f"Opening: {url}")
@@ -63,43 +58,19 @@ def safe_goto(page, url) ->bool:
         print(f"Error opening page: {e}")
         return False
 
+
 def scrape_entertainment(page):
     """
-       Scrape the top entertainment articles from Ekantipur.
+    Scrape the top entertainment articles from Ekantipur.
 
-    This function navigates to the entertainment section of ekantipur.com
-    and extracts a list of articles, each containing:
-        - title
-        - image URL
-        - author
-        - category (typically 'मनोरञ्जन' beacaue we are hiting entertainment endpoint)
-
-    It handles:
-        - Page navigation errors
-        - Missing or malformed elements
-        - Timeouts while waiting for articles
+    Navigates to the entertainment section and extracts up to TOP_N articles.
+    Each article contains: title, image_url, author, category.
 
     Parameters:
         page: Playwright Page object
-            The browser tab to perform scraping on.
 
     Returns:
-        list[dict]:
-            - Each dict contains:
-                {
-                    "title": str | None,
-                    "image_url": str | None,
-                    "author": str | None,
-                    "category": str
-                }
-            - Returns an empty list if page fails to load or no articles found.
-
-    Example usage:
-        articles = scrape_entertainment(page)
-        for article in articles:
-            print(article["title"])
-    
-
+        list[dict]: List of article dicts, empty list if page fails to load.
     """
     print("\nScraping entertainment news...")
 
@@ -120,17 +91,19 @@ def scrape_entertainment(page):
 
     news_list = []
 
-    for i, card in enumerate(cards[:TOP_N]):
+    for card in cards[:TOP_N]:
         try:
             title = get_text(card.query_selector("h2 a"))
 
             img = card.query_selector("img")
+            # data-src is used for lazy-loaded images; fall back to src
             image_url = make_absolute(
                 get_attr(img, "data-src") or get_attr(img, "src")
             )
 
             author = get_text(card.query_selector(".author-name a"))
 
+            # Category is always मनोरञ्जन on this page — no badge element exists
             article = {
                 "title": title,
                 "image_url": image_url,
@@ -139,50 +112,27 @@ def scrape_entertainment(page):
             }
 
             news_list.append(article)
-
-            print(f" + {title}")
+            print(f"  + {title}")
 
         except Exception as e:
-            print(f"Skipping one article due to error: {e}")
+            print(f"  Skipping article: {e}")
             continue
 
     return news_list
+
 
 def scrape_cartoon(page):
     """
     Scrape the Cartoon of the Day from Ekantipur.
 
-    This function navigates to the cartoon section of ekantipur.com and extracts:
-        - title: The cartoon title
-        - author: The cartoon author
-        - image_url: The URL of the cartoon image
-
-    The title and author are usually stored together in a paragraph
-    as "Title - Author". The function splits this string to extract
-    both fields.
-
-    It handles:
-        - Page navigation errors
-        - Timeouts when waiting for cartoon elements
-        - Missing or malformed elements
-        - Parsing errors
+    The description paragraph holds title and author together as "Title - Author".
+    The full-resolution image URL is in the anchor href, not the img src.
 
     Parameters:
         page: Playwright Page object
-            The browser tab used for scraping.
 
     Returns:
-        dict:
-            {
-                "title": str | None,
-                "author": str | None,
-                "image_url": str | None
-            }
-            Returns an empty dict {} if scraping fails.
-
-    Example usage:
-        cartoon = scrape_cartoon(page)
-        print(cartoon["title"], "by", cartoon["author"])
+        dict: {title, author, image_url}, or empty dict {} if scraping fails.
     """
     print("\nScraping cartoon...")
 
@@ -196,6 +146,7 @@ def scrape_cartoon(page):
         return {}
 
     try:
+        # Description paragraph contains "Title - Author" as a single string
         text = get_text(page.query_selector(".cartoon-description p"))
 
         if text and " - " in text:
@@ -203,10 +154,11 @@ def scrape_cartoon(page):
         else:
             title, author = text, None
 
+        # Prefer the anchor href (full resolution) over img src (thumbnail)
         link = page.query_selector(".cartoon-image a")
         image_url = make_absolute(get_attr(link, "href"))
 
-        print(f" + {title} by {author}")
+        print(f"  + {title} by {author}")
 
         return {
             "title": title,
@@ -218,38 +170,23 @@ def scrape_cartoon(page):
         print(f"Error extracting cartoon: {e}")
         return {}
 
+
 def run_scraper():
     """
-    Run the Ekantipur scraper and save results to a JSON file.
+    Orchestrates the full scrape and saves results to output.json.
 
-    This function:
-        1. Launches a Playwright Chromium browser.
-        2. Opens a page and scrapes:
-            - Top entertainment articles (scrape_entertainment)
-            - Cartoon of the Day (scrape_cartoon)
-        3. Closes the browser safely.
-        4. Saves the collected data to 'output.json'.
-    
-    Error handling:
-        - Any browser or scraping error is caught and logged.
-        - File write errors are caught and logged.
-        - Function continues without crashing on individual errors.
+    Launches a single Chromium browser, runs both scrapers on the same page,
+    then writes the combined result to OUTPUT_FILE.
 
-    Parameters:
-        None
-
-    Returns:
-        None
-        - Output is written to 'output.json' in the current directory.
-
-    Example usage:
-        run_scraper()
-        -> Saves entertainment news and cartoon to output.json
+    Output format:
+        {
+            "entertainment_news": [ {title, image_url, author, category} ],
+            "cartoon_of_the_day": {title, author, image_url}
+        }
     """
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-
             page = browser.new_page()
 
             entertainment = scrape_entertainment(page)
@@ -261,16 +198,16 @@ def run_scraper():
         print(f"Critical error: {e}")
         return
 
+
     data = {
         "entertainment_news": entertainment,
-        "cartoon": cartoon
+        "cartoon_of_the_day": cartoon
     }
 
     try:
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-
-        print("\nSaved to output.json ")
+        print(f"\nSaved to {OUTPUT_FILE}")
 
     except Exception as e:
         print(f"Error saving file: {e}")
@@ -278,4 +215,3 @@ def run_scraper():
 
 if __name__ == "__main__":
     run_scraper()
-
