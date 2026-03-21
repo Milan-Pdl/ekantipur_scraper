@@ -148,4 +148,75 @@ def scrape_entertainment(page):
 
     return news_list
 
+def scrape_cartoon(page):
+    """
+    Scrape the Cartoon of the Day from Ekantipur.
+
+    This function navigates to the cartoon section of ekantipur.com and extracts:
+        - title: The cartoon title
+        - author: The cartoon author
+        - image_url: The URL of the cartoon image
+
+    The title and author are usually stored together in a paragraph
+    as "Title - Author". The function splits this string to extract
+    both fields.
+
+    It handles:
+        - Page navigation errors
+        - Timeouts when waiting for cartoon elements
+        - Missing or malformed elements
+        - Parsing errors
+
+    Parameters:
+        page: Playwright Page object
+            The browser tab used for scraping.
+
+    Returns:
+        dict:
+            {
+                "title": str | None,
+                "author": str | None,
+                "image_url": str | None
+            }
+            Returns an empty dict {} if scraping fails.
+
+    Example usage:
+        cartoon = scrape_cartoon(page)
+        print(cartoon["title"], "by", cartoon["author"])
+    """
+    print("\nScraping cartoon...")
+
+    if not safe_goto(page, f"{BASE_URL}/cartoon"):
+        return {}
+
+    try:
+        page.wait_for_selector(".cartoon-image", timeout=10000)
+    except TimeoutError:
+        print("Cartoon not found")
+        return {}
+
+    try:
+        text = get_text(page.query_selector(".cartoon-description p"))
+
+        if text and " - " in text:
+            title, author = text.split(" - ", 1)
+        else:
+            title, author = text, None
+
+        link = page.query_selector(".cartoon-image a")
+        image_url = make_absolute(get_attr(link, "href"))
+
+        print(f" + {title} by {author}")
+
+        return {
+            "title": title,
+            "author": author,
+            "image_url": image_url
+        }
+
+    except Exception as e:
+        print(f"Error extracting cartoon: {e}")
+        return {}
+
+
 
