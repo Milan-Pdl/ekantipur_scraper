@@ -164,7 +164,7 @@ WHAT I DID NOT USE AI FOR
   - Installing uv and setting up the project (followed the docs)
   - Finding CSS selectors (used DevTools myself on both pages)
   - Understanding data-src vs src for lazy loading (read Playwright docs)
-  - Debugging with print() to verify article counts
+  - Debugging with print() to verify counts
   - Checking the output.json format matched the assessment requirement
 
 

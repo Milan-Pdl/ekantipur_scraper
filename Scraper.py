@@ -17,7 +17,7 @@ def make_absolute(url):
         return BASE_URL + url
     if url.startswith("//"):
         return "https:" + url
-    return url
+    return url      
 
 
 def get_text(el):
@@ -103,7 +103,7 @@ def scrape_entertainment(page):
 
             author = get_text(card.query_selector(".author-name a"))
 
-            # Category is always मनोरञ्जन on this page — no badge element exists
+            # Category is always मनोरञ्जन on this page no badge element exists
             article = {
                 "title": title,
                 "image_url": image_url,
